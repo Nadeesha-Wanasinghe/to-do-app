@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import javax.annotation.PreDestroy;
 import java.sql.*;
+import java.util.LinkedList;
 import java.util.List;
 
 @RestController
@@ -21,8 +22,8 @@ public class TaskHttpController {
     public TaskHttpController() {
         HikariConfig config = new HikariConfig();
         config.setUsername("postgres");
-        config.setPassword("postgres");
-        config.setJdbcUrl("jdbc:postgresql://localhost:15000/dep11_todo_app");
+        config.setPassword("postgresql");
+        config.setJdbcUrl("jdbc:postgresql://localhost:5432/dep11_todo_app");
         config.setDriverClassName("org.postgresql.Driver");
         config.addDataSourceProperty("maximumPoolSize", 10);
         pool = new HikariDataSource(config);
@@ -78,13 +79,38 @@ public class TaskHttpController {
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
-    public void deleteTask(@PathVariable("id") String taskId) {
-        System.out.println("deleteTask()");
+    public void deleteTask(@PathVariable("id") int taskId) {
+        try(Connection connection = pool.getConnection()){
+            PreparedStatement stmExist = connection
+                    .prepareStatement("SELECT * FROM task WHERE id = ?");
+            stmExist.setInt(1, taskId);
+            if (!stmExist.executeQuery().next()){
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Task Not Found");
+            }
+
+            PreparedStatement stm = connection.prepareStatement("DELETE FROM task WHERE id=?");
+            stm.setInt(1, taskId);
+            stm.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @GetMapping(produces = "application/json")
     public List<TaskTO> getAllTasks() {
-        System.out.println("getAllTasks()");
-        return null;
+        try(Connection connection = pool.getConnection()){
+            Statement stm = connection.createStatement();
+            ResultSet rst = stm.executeQuery("SELECT * FROM task ORDER BY id");
+            List<TaskTO> taskList = new LinkedList<>();
+            while (rst.next()){
+                int id = rst.getInt("id");
+                String description = rst.getString("description");
+                boolean status = rst.getBoolean("status");
+                taskList.add(new TaskTO(id, description, status));
+            }
+            return taskList;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
