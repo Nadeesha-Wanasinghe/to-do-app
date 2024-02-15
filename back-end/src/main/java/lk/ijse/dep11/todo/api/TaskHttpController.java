@@ -15,6 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/tasks")
+@CrossOrigin
 public class TaskHttpController {
 
     private final HikariDataSource pool;
