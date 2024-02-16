@@ -1,46 +1,78 @@
 const txtElm = document.querySelector("#txt");
 const btnAddElm = document.querySelector("#btn-add");
 const taskContainerElm = document.querySelector("#task-container");
+const {API_URL} = process.env;
 
 loadAllTasks();
 
 function loadAllTasks(){
-    // Todo: Retreive all tasks from the back-end
-    const taskList = [
-        {id: 1, description: 'Task 1', status: false},
-        {id: 2, description: 'Task 2', status: true},
-        {id: 3, description: 'Task 3', status: true},
-        {id: 4, description: 'Task 4', status: false},
-    ];
-    taskList.forEach(task => createTask(task));
+    fetch(`${API_URL}/tasks`).then(res => {
+        if (res.ok){
+            res.json().then(taskList => taskList.forEach(task => createTask(task))) ;
+        }else{
+            alert("Failed to load task list");
+        }
+    }).catch(err => {
+        alert("Something went wrong, try again later");
+    });
 }
 
 function createTask(task){
     const liElm = document.createElement('li');
     taskContainerElm.append(liElm);
+    liElm.id = "task-" + task.id;
+    liElm.className = 'd-flex justify-content-between p-1 px-3 align-items-center';
 
     liElm.innerHTML = `
-        <input id="chk-task-${task.id}" type="checkbox" ${task.status ? "checked": ""}>
-        <label for="chk-task-${task.id}">${task.description}</label>
-        <i class="delete bi bi-trash"></i>    
+        <div class="flex-grow-1 d-flex gap-2 align-items-center">
+            <input class="form-check-input m-0" id="chk-task-${task.id}" type="checkbox" ${task.status ? "checked": ""}>
+            <label class="flex-grow-1" for="chk-task-${task.id}">${task.description}</label>
+        </div>
+        <i class="delete bi bi-trash fs-4"></i>    
     `;
 }
 
 taskContainerElm.addEventListener('click', (e)=>{
     if (e.target?.classList.contains('delete')){
-        // Todo: Delete the task from the back-end
-        // If success
-        e.target.closest("li").remove();
+
+        const taskId = e.target.closest('li').id.substring(5);
+
+        fetch(`${API_URL}/tasks/${taskId}`, {method: 'DELETE'})
+        .then(res => {
+            if (res.ok){
+                e.target.closest("li").remove();
+            }else{
+                alert("Failed to delete the task");
+            }
+        }).catch(err => {
+            alert("Something went wrong, try again later");
+        });  
+
     } else if (e.target?.tagName === "INPUT"){
-        // Todo: Update the task status in the back-end
-        // If not success
-        if (!false){
-            e.preventDefault();
-        }
+
+        const taskId = e.target.closest('li').id.substring(5);
+        const task = {
+            description: e.target.nextElementSibling.innerText,
+            status: e.target.checked
+        };
+
+        fetch(`${API_URL}/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(task)
+        }).then(res => {
+            if (!res.ok){
+                e.target.checked = false;
+                alert("Failed to update the task status");
+            }
+        }).catch(err => {
+            e.target.checked = false;
+            alert("Something went wrong, try again");
+        })
     }
 });
-
-let taskId = 0;
 
 btnAddElm.addEventListener('click', ()=>{
     const taskDescription = txtElm.value;
@@ -51,10 +83,23 @@ btnAddElm.addEventListener('click', ()=>{
         return;
     }
 
-    // Todo: Save the task in the back-end
-    // If success
-
-    createTask({id: taskId++, description: taskDescription, status: false});
-    txtElm.value = "";
-    txtElm.focus();
+    fetch(`${API_URL}/tasks`, {
+        method: 'POST',
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({description: txtElm.value})
+    }).then(res => {
+        if (res.ok){
+            res.json().then(task => {
+                createTask(task);
+                txtElm.value = "";
+                txtElm.focus();
+            });
+        }else{
+            alert("Failed to add the task");
+        }
+    }).catch(err => {
+        alert("Something went wrong, try again later");
+    });
 });
